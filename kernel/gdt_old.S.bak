@@ -1,0 +1,46 @@
+/* GDT for 64-bit mode - Dead code, kept for reference */
+
+.section .text
+.global gdt_init
+
+gdt_init:
+    /* Load our GDT */
+    lgdt gdtptr(%rip)
+    
+    /* Reload data segment registers */
+    movw $0x10, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+    movw %ax, %ss
+    
+    ret
+
+/* GDT entries */
+.align 16
+gdt_start:
+    /* Null descriptor */
+    .quad 0
+    
+    /* Code segment (64-bit): Base=0, Limit=0xFFFFF, DPL=0, L=1, P=1 */
+    .value 0xFFFF           /* Limit bits 0-15 */
+    .value 0                /* Base bits 0-15 */
+    .byte 0                 /* Base bits 16-23 */
+    .byte 0x9A              /* Access: P=1, DPL=00, S=1, Type=1010 (Code, Read) */
+    .byte 0x20              /* Flags: G=0, D=0, L=1, AVL=0; Limit 16-19=0 */
+    .byte 0                 /* Base bits 24-31 */
+    
+    /* Data segment (64-bit): Base=0, DPL=0, Writable */
+    .value 0xFFFF
+    .value 0
+    .byte 0
+    .byte 0x92              /* Access: P=1, DPL=00, S=1, Type=0010 (Data, Writable) */
+    .byte 0x00              /* Flags: G=0, D=0, L=0, AVL=0 */
+    .byte 0
+
+gdt_end:
+
+gdtptr:
+    .value gdt_end - gdt_start - 1  /* GDT limit */
+    .quad gdt_start                /* GDT base address */
