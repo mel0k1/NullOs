@@ -1,0 +1,20 @@
+# Build outputs and local sysroots (never commit)
+NullOs/build/
+build/
+stage/
+tools/
+src/
+qemu-debs/
+qemu-root/
+logs/scenario2_www/
+logs/*/
+__pycache__/
+*.iso
+*.img
+*.o
+*.log
+*.elf
+
+# Reference trees (upstream clones, reproducible; see worklog for pins)
+labwc/
+dwl/
