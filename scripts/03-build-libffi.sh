@@ -1,5 +1,5 @@
 #!/bin/bash
-# 03-build-libffi.sh — libffi 3.4.7 static musl -> stage/
+# 03-build-libffi.sh — libffi 3.4.8 static musl -> stage/
 # Рецепт Layer-0: CC=musl-gcc; LDFLAGS=-static (на хосте нет /lib/ld-musl,
 # динамические тест-бинари не запустятся); UAPI-шим linux/limits.h
 # (musl не ставит kernel UAPI заголовки).
@@ -38,12 +38,12 @@ typedef __u64 __aligned_u64 __attribute__((aligned(8)));
 EOF
 
 cd "$BUILD"
-[ -d libffi-3.4.7 ] || tar xf "$SRC/libffi-3.4.7.tar.gz"
+[ -d libffi-3.4.8 ] || tar xf "$SRC/libffi-3.4.8.tar.gz"
 mkdir -p libffi-build && cd libffi-build
 
 export CC="$ROOT/tools/musl/bin/musl-gcc"
 export LDFLAGS="-static"
-../libffi-3.4.7/configure --prefix="$STAGE" --disable-shared --enable-static \
+../libffi-3.4.8/configure --prefix="$STAGE" --disable-shared --enable-static \
   --disable-docs --disable-multi-os-directory > configure.log 2>&1 \
   || { tail -20 configure.log; exit 1; }
 

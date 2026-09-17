@@ -571,3 +571,80 @@ Stage Summary:
   AT_RANDOM/AT_PHDR/AT_PAGESZ; envp exec пустой — XDG_RUNTIME_DIR решается setenv в labwc;
   DRM-шиму ядра надо расширить (GET_CAP/SET_CLIENT_CAP/ADDFB2/RMFB/properties) под wlroots;
   signalfd — честный no-op (graceful exit под вопросом, kill -9 работает).
+
+---
+Task ID: 25
+Agent: ZCode (win32-WSL сессия)
+Task: Перенос сборки в постоянное окружение владельца (Windows: QEMU 11.0 + nasm;
+WSL Ubuntu 26.04 — весь остальной тулчейн), защита кода в GitHub
+(github.com/mel0k1/NullOs), воспроизведение Layer-0 и продвижение по роадмапу:
+xkbcommon+xkeyboard-config (Layer-0.5), pixman+libdrm+libdisplay-info (Layer-0.6,
+депы wlroots-0.20). Проверка virtio-gpu в QEMU.
+
+Work Log:
+- ОКРУЖЕНИЕ: DNS в WSL был сломан полностью (/etc/resolv.conf отсутствовал) →
+  статические 8.8.8.8/1.1.1.1 + [network] generateResolvConf=false в /etc/wsl.conf.
+  Пакеты WSL: meson 1.10.1, ninja 1.13.2, pkg-config 2.5.1, file, hwdata,
+  grub-pc-bin, xorriso, mtools, qemu-system-x86 10.2.1. Windows-QEMU 11.0.0 —
+  только прогоны; сборка — вся в WSL.
+- РЕПОЗИТОРИЙ: чистое дерево = pivot-ядро (Task 23) + Layer-0 скрипты/пробы;
+  baseline-коммит 98df3aa запушен в main. .gitignore (build/stage/tools/src/..),
+  .gitattributes (LF). Структура: NullOs/ + scripts/ + logs/ + sandbox-scripts/ +
+  worklog.md. WSL-симлинки: /home/z/my-project/{nulos/NullOs,scripts} → дерево репо.
+- ИСТОЧНИКИ (src/): musl 1.2.5, wayland 1.23.1, wayland-protocols 1.47 — Debian
+  pool (ловня из Task 24 подтверждена). ЛОВНЯ НОВАЯ: Debian orig-тарболлы libffi
+  и expat — git-снапшоты БЕЗ generated configure (autogen.sh) → брать ОФИЦИАЛЬНЫЕ
+  релизы: GitHub libffi v3.4.8, libexpat R_2_7_1. ЛОВНЯ: у libxkbcommon
+  GitHub-releases assets=[] (пусто), 404 на все версии → Debian orig 1.13.1
+  (git-снапшот xkbcommon-libxkbcommon-920ea79) — meson-проекту autotools не нужны,
+  просто mv в libxkbcommon-1.13.1. Версии-номинанты: libxkbcommon 1.13.1,
+  xkeyboard-config 2.48, pixman 0.46.4, libdrm 2.4.134, libdisplay-info 0.3.0.
+- ЛОВНЯ UAPI-2.0: точечных шимов (linux/limits.h, linux/types.h) хватает libffi,
+  но libdrm's drm.h требует <asm/ioctl.h> → ПОЛНЫЕ kernel UAPI заголовки
+  (linux/, asm/, asm-generic/, misc/) из хостового linux-libc-dev копируются в
+  tools/musl/include (scripts/03b-install-uapi.sh; запускать ПОСЛЕ 03 — реальные
+  UAPI перезаписывают шимы, это ок).
+- ЛОВНЯ libdrm: intel/radeon/amdgpu/nouveau/vmwgfx/man-pages — feature-опции
+  (enabled/disabled/auto), tests — boolean; смешение типов = ERROR на setup.
+- ЛОВНЯ libdisplay-info: нужен hwdata (pnp.ids) НА СБОРКЕ, ищет в $STAGE/share/
+  hwdata/pnp.ids (копировать из хоста); pc-файл называется libdisplay-info.pc
+  (не display-info.pc); заголовки в libdisplay-info/ (info.h + edid.h — struct
+  di_edid_screen_size определён в edid.h); API 0.3.0: di_edid_get_vendor_product
+  → vp->manufacturer это char[3] БЕЗ NUL — strcmp/printf по нему = UB →
+  сегфолт на выходе смоука; лечится копией в локальный buf[4].
+- [MILESTONE] Layer-0 E2E PASS (wlprobe vs fakecomp, реальный unix-сокет,
+  globals=1 shm=1) — воспроизведён на новом окружении.
+- [MILESTONE] xkb Layer-0.5 PASS (scripts/06-build-xkb-stack.sh): xkbsmoke
+  (musl-static) компилирует keymap "us" из staged xkeyboard-config
+  (XKB_DEFAULT_ROOT): layouts=1 keycodes=[9..709] key38='a' dump=35411B.
+- [MILESTONE] wlroots-deps Layer-0.6 PASS (scripts/07-build-wlroots-deps.sh):
+  pixsmoke (solid fill, px=ffff0000), drmsmoke (linkage+EBADF-проба),
+  ldismoke (синтетический EDID 128Б, mfr=NUL 30x20cm).
+- ЯДРО: пересобрано из репо-дерева (make -j4, WSL gcc; userland ELFs + busybox
+  embed; kernel.bin 4.4M — совпадает с known-good Task 23). ISO через
+  grub-mkrescue (make iso). QEMU: Windows 11.0 boot OK (serial до
+  "[K] entering mainloop", PMM free=391MB); WSL 10.2.1: battery — boot 12.4s,
+  hello=42, wltest/unixtest/layertest exit=0, drmtest exit=0 c полным DRM-следом
+  (open card0 → DUMBCREATE → MMAP ret=20000000 → SETCRTC → second dumb+mmap →
+  text mode restored). drmtest "[FAIL]"-вердикт харнесса = задокументированный
+  Task 23 артефакт переинициализации консоли (промпт не перерисован); по serial
+  выход честный 0 → считается PASS.
+- virtio-gpu: Windows QEMU 11.0 поддерживает virtio-gpu-device/-vga (device help
+  подтверждён) — драйвер в NullOs-ядре по-прежнему отсутствует; DRM-lite стоит
+  на Bochs DISPI/std-VGA. Путь к wlroots-на-virtio-gpu: отдельная kernel-задача
+  (virtio queue + display dtype + dma), не блокирует DRM-бэкенд wlroots на
+  std-VGA через расширение DRM-шимы.
+
+Stage Summary:
+- Постоянное окружение восстановлено и ЗАФИКСИРОВАНО в git — сессии больше не
+  теряют код (репо) и рецепты (scripts/02..07 в репо).
+- Substrate: wayland+libffi+expat+musl → xkbcommon+xkeyboard-config →
+  pixman+libdrm+libdisplay-info — всё musl-static в stage/, все E2E зелёные.
+- Ядро и батарея Task 23 воспроизводятся из чистого репо-дерева.
+- Дальше по роадмапу: libseat-lite/libinput-lite .pc-обёртки + pkg-config файлы →
+  wlroots-0.20-minimal (meson: backends=drm,libinput,headless; renderers=pixman)
+  → glib-lite → xml2/png → cairo-lite → pango-lite → labwc.
+- OPEN (перенос из Task 24): auxv в elf.c пуст; envp на exec пуст; DRM-шима под
+  wlroots (GET_CAP/SET_CLIENT_CAP/ADDFB2/RMFB/properties); signalfd no-op.
+  НОВЫЕ OPEN: setrlimit/increase_nofile_limit, XDG_RUNTIME_DIR на exec,
+  wlroots libinput path-mode (нет uevents), virtio-gpu kernel driver (опция).

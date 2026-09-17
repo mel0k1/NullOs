@@ -8,7 +8,7 @@ ROOT=/home/z/my-project; SRC=$ROOT/src; BUILD=$ROOT/build; STAGE=$ROOT/stage
 
 # ---------- 1) expat (autotools) ----------
 cd "$BUILD"
-[ -d expat-2.7.1 ] || tar xJf "$SRC/expat.tar.xz"
+[ -d expat-2.7.1 ] || tar xf "$SRC/expat.tar.gz"
 mkdir -p expat-build && cd expat-build
 if [ ! -f Makefile ]; then
   ../expat-2.7.1/configure --prefix="$STAGE" --disable-shared --enable-static \
